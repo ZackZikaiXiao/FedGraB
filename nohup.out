@@ -1,0 +1,12 @@
+usage: local_pid_hetero.py [-h] [--iteration1 ITERATION1] [--rounds ROUNDS]
+                           [--local_ep LOCAL_EP] [--frac FRAC]
+                           [--num_users NUM_USERS] [--local_bs LOCAL_BS]
+                           [--lr LR] [--momentum MOMENTUM] [--beta BETA]
+                           [--model MODEL] [--dataset DATASET] [--pretrained]
+                           [--iid] [--non_iid_prob_class NON_IID_PROB_CLASS]
+                           [--alpha_dirichlet ALPHA_DIRICHLET]
+                           [--num_classes NUM_CLASSES]
+                           [--num_channels NUM_CHANNELS] [--seed SEED]
+                           [--loss_type LOSS_TYPE] [--balanced_global]
+                           [--IF IF] [--gpu GPU]
+local_pid_hetero.py: error: unrecognized arguments: cd /home/zikai/zikai/aaFL/fl_framework_lss

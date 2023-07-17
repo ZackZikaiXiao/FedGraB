@@ -1,0 +1,13 @@
+/output
+/util/__pycache__
+/temp
+/runs_tensorboard
+/pfed_lastest/mytools/__pycache__
+/pfed_lastest/model/__pycache__
+/data
+/cifar_lt
+/.idea
+/__pycache__
+/mytools/visualization
+/mytools/__pycache__
+/model/__pycache__

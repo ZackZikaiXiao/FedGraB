@@ -1,0 +1,18 @@
+python main.py --gpu 2 --iid --IF 0.01  
+python main.py --gpu 2 --iid --IF 0.02  
+python main.py --gpu 2 --iid --IF 0.1
+
+
+python main.py --gpu 2 --alpha_dirichlet 0.5 --IF 0.01  
+python main.py --gpu 3 --alpha_dirichlet 0.5 --IF 0.02  
+python main.py --gpu 3 --alpha_dirichlet 0.5 --IF 0.1
+
+
+python main.py --gpu 3 --balanced_global --IF 0.01  
+python main.py --gpu 3 --balanced_global --IF 0.02  
+python main.py --gpu 3 --balanced_global --IF 0.1
+
+
+python main.py --gpu 0 --alpha_dirichlet 1 --IF 0.01  
+python main.py --gpu 0 --alpha_dirichlet 1 --IF 0.02  
+python main.py --gpu 0 --alpha_dirichlet 1 --IF 0.1
