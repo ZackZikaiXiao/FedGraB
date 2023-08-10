@@ -368,7 +368,7 @@ class LocalUpdate(object):
                 # init
                 # 首先使用ce_loss进行反向传播并更新所有参数
                 net.zero_grad()
-                feat = net(images)
+                feat = net(images, True)
                 logits_1 = GBA_Layer_1(feat)
                 logits_2 = GBA_Layer_2(logits_1)
                 loss = ce_loss(logits_2, labels) 

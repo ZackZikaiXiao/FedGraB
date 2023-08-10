@@ -106,7 +106,7 @@ class PIDLOSS(nn.Module):
         self.test_with_obj = test_with_obj
 
         def _func(x):
-            return (10 / 9) / ((1 / 9) + torch.exp(-0.5 * x))
+            return (10 / 9) / ((1 / 9) + torch.exp(-0.05 * x))
         self.map_func = partial(_func)
 
     def clear(self):
@@ -177,7 +177,7 @@ class PIDLOSS(nn.Module):
             cls_score, self.target, reduction='none')
         # cls_loss = torch.sum(cls_loss * self.weight) / self.n_i
         cls_loss = torch.sum(cls_loss) / self.n_i
-        hook_handle = cls_score.register_hook(self.hook_func_tensor)
+        hook_handle = cls_score.register_hook(self.hook_func_tensor_bak)
         # self.collect_grad(cls_score.detach(), self.target.detach(), self.weight.detach())
         # self.print_for_debug()
         # hook_handle.remove()

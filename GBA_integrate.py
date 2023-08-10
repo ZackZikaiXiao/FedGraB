@@ -15,7 +15,7 @@ import pdb
 from tqdm import tqdm
 from options import args_parser
 from util.update_baseline import *
-from util.fedavg import FedAvg, FedAvg_noniid, Weighted_avg_f1, weno_aggeration, FedAvg_Rod
+from util.fedavg import *
 # from util.util import add_noise
 from util.dataset import *
 from util.losses import *
@@ -28,6 +28,7 @@ from matplotlib import pyplot as plt
 
 np.set_printoptions(threshold=np.inf)
 
+save_pkl = False # True / False
 
 class WENO():
     def __init__(self, class_num):
@@ -156,7 +157,22 @@ def get_acc_file_path(args):
     fpath =  rootpath + '_acc_{}_{}_cons_frac{}_iid{}_iter{}_ep{}_lr{}_N{}_{}_seed{}_p{}_dirichlet{}_IF{}_Loss{}.txt'.format(
         args.dataset, args.model, args.frac, args.iid, args.rounds, args.local_ep, args.lr, args.num_users, args.num_classes, args.seed, args.non_iid_prob_class, args.alpha_dirichlet, args.IF, args.loss_type)
     return fpath
-   
+
+
+
+class ClassifierAdded(nn.Module):
+    def __init__(self, g_classifier, g_classifier_sgb):
+        super(ClassifierAdded, self).__init__()
+        self.g_classifier = g_classifier
+        self.g_classifier_sgb = g_classifier_sgb
+
+    def forward(self, x):
+        x = self.g_classifier(x)
+        x = self.g_classifier_sgb(x)
+        return x
+    
+
+    
 if __name__ == '__main__':
     # parse args
     args = args_parser()
@@ -202,19 +218,22 @@ if __name__ == '__main__':
     num_classes = 100
     # build model, 这个是全局模型，对于server而言，g_backnone和g_classifier即使architecture也是weights
     g_backbone = build_model(args)    # 全局模型中的feature extractor部分
-    g_classifier = nn.Linear(512*block_expansion, num_classes).to(args.device) # 全局模型中的classifier部分
+    g_classifier = nn.Linear(512*block_expansion, 512*block_expansion).to(args.device) # 全局模型中的classifier部分
+    g_classifier_sgb = nn.Linear(512*block_expansion, num_classes).to(args.device) # 全局模型中的classifier部分
     # copy weights
     # w_backnone = g_backbone.state_dict()  # return a dictionary containing a whole state of the module
-    g_backbone = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/g_backbone/g_backbone_1220.pth")
-    g_classifier = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/g_classifier/g_classifier_1220.pth")
-    g_backbone.to(args.device)
-    g_classifier.to(args.device)
+    # g_backbone = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/g_backbone/g_backbone_1220.pth")
+    # g_classifier = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/g_classifier/g_classifier_1220.pth")
+    # g_backbone.to(args.device)
+    # g_classifier.to(args.device)
     
     wene = WENO(class_num=100)
     wene.weno_estimation(g_classifier.state_dict())
     
-    
-    acc_s2, global_3shot_acc = globaltest_GBA_Layer(backbone = copy.deepcopy(g_backbone).to(args.device), classifier = copy.deepcopy(g_classifier).to(args.device), test_dataset = dataset_test, args = args, dataset_class = datasetObj)
+    g_backbone = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/gba_integrate_spar_fixed/g_backbone/g_backbone_499.pth")
+    g_classifier = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/gba_integrate_spar_fixed/g_classifier1/g_classifier1_499.pth")
+    g_classifier_sgb = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/gba_integrate_spar_fixed/g_classifier2/g_classifier2_499.pth")
+    acc_s2, global_3shot_acc = globaltest_GBA_Layer(backbone = copy.deepcopy(g_backbone).to(args.device), classifier = copy.deepcopy(ClassifierAdded(g_classifier, g_classifier_sgb)).to(args.device), test_dataset = dataset_test, args = args, dataset_class = datasetObj)
     print('global test acc  %.3f \n'%(acc_s2))
     print('global 3shot acc: [head: %.3f, middle: %.3f, tail: %.3f] \n'%(global_3shot_acc["head"], global_3shot_acc["middle"], global_3shot_acc["tail"]))
 
@@ -226,9 +245,12 @@ if __name__ == '__main__':
     # classifier init，分为global classifier和local classifier
     # resnet中forward(self, x, latent_output=False)中的false改为true
     # local的两个linear
-    g_linears = [nn.Linear(512*block_expansion, num_classes) for i in range(args.num_users)]
+    g_linears = [nn.Linear(512*block_expansion, 512*block_expansion) for i in range(args.num_users)]
+    g_linears_sgb = [nn.Linear(512*block_expansion, num_classes) for i in range(args.num_users)]
     for i in range(args.num_users):
         g_linears[i] = g_linears[i].to(args.device)
+        # nn.init.sparse_(g_linears[i].weight, sparsity=0.6)
+        g_linears_sgb[i] = g_linears_sgb[i].to(args.device)
     # pid init
     g_pid_losses = [PIDLOSS(device=args.device, num_classes=100, pidmask=["head", "middle"], class_activation = False) for i in range(args.num_users)] # 每一个client都有一个pidloss
     # 算出head, middle和tail
@@ -242,7 +264,7 @@ if __name__ == '__main__':
     # weno_obj = WENO(class_num = 10)
     # global pid init
     for idx in range(args.num_users):
-        g_pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 1)], middle_class=[i for i in range(1, 2)], tail_class=[i for i in range(2, 100)])
+        g_pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 1)], middle_class=[i for i in range(1, 25)], tail_class=[i for i in range(25, 100)])
         # g_pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 27)], middle_class=[i for i in range(27, 52)], tail_class=[i for i in range(52, 100)])
         # g_pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 27)], middle_class=[i for i in range(27, 75)], tail_class=[i for i in range(75, 101)])
         # 注意下面两个的顺序，类激活将没有mask的class初始化为关闭，根据label打开
@@ -252,18 +274,17 @@ if __name__ == '__main__':
     
     
     # add fl training
-    for rnd in tqdm(range(1000, args.rounds+1000)):
-        backbone_w_locals, linear_w_locals_1, loss_locals = [], [], []
+    for rnd in tqdm(range(args.rounds)):
+        backbone_w_locals, linear_w_locals_1, linear_w_locals_2, loss_locals = [], [], [], []
         idxs_users = np.random.choice(range(args.num_users), m, replace=False, p=prob)
         for idx in range(args.num_users):  # training over the subset, in fedper, all clients train
             local = LocalUpdate(args=args, dataset=dataset_train, idxs=dict_users[idx])
 
-            backbone_w_local, linear_w_local, loss_local = local.update_weights_GBA_Layer_finetune(net=copy.deepcopy(g_backbone).to(args.device), seed=args.seed, epoch=args.local_ep, GBA_Loss = g_pid_losses[idx], GBA_Layer = g_linears[idx])
+            backbone_w_local, linear_w_local_1, linear_w_local_2, loss_local = local.update_weights_GBA_Layer_finetune(net=copy.deepcopy(g_backbone).to(args.device), seed=args.seed, epoch=args.local_ep, GBA_Loss = g_pid_losses[idx], GBA_Layer_1 = g_linears[idx], GBA_Layer_2 = g_linears_sgb[idx])
             # backbone_w_local, linear_w_local, loss_local = local.update_weights_GBA_Layer_finetune(net=copy.deepcopy(g_backbone).to(args.device), seed=args.seed, epoch=args.local_ep, GBA_Loss = nn.CrossEntropyLoss(), GBA_Layer = g_linears[idx])
-
-
             backbone_w_locals.append(copy.deepcopy(backbone_w_local))  # store every updated model
-            linear_w_locals_1.append(copy.deepcopy(linear_w_local))
+            linear_w_locals_1.append(copy.deepcopy(linear_w_local_1))
+            linear_w_locals_2.append(copy.deepcopy(linear_w_local_2))
             loss_locals.append(copy.deepcopy(loss_local))
             # if idx == 2:
             #     break
@@ -271,19 +292,43 @@ if __name__ == '__main__':
         dict_len = [len(dict_users[idx]) for idx in idxs_users]
         # print(linear_w_locals)
         # w_glob = weno_aggeration(w_locals, dict_len, datasetObj)
-        backbone_w_avg, linear_w_avg = FedAvg_Rod(backbone_w_locals, linear_w_locals_1, dict_len)      # 聚合
+        # backbone_w_avg, linear_w_avg = FedAvg_Rod(backbone_w_locals, linear_w_locals_1, dict_len)      # 聚合
+        backbone_w_avg, linear_w_avg_1, linear_w_avg_2 = FedAvg_Integrate(backbone_w_locals, linear_w_locals_1, linear_w_locals_2, dict_len)      # 聚合
+        
 
 
         g_backbone.load_state_dict(copy.deepcopy(backbone_w_avg))
-        g_classifier.load_state_dict(copy.deepcopy(linear_w_avg))
-        if rnd % 1 == 0:
-            acc_s2, global_3shot_acc = globaltest_GBA_Layer(backbone = copy.deepcopy(g_backbone).to(args.device), classifier = copy.deepcopy(g_classifier).to(args.device), test_dataset = dataset_test, args = args, dataset_class = datasetObj)
-            # torch.save(g_backbone, "./output/g_backbone/" + "g_backbone_" + str(rnd) + ".pth")
-            # torch.save(g_classifier, "./output/g_classifier/" + "g_classifier_" + str(rnd) + ".pth")
-            print('round %d, global test acc  %.3f \n'%(rnd, acc_s2))
-            print('round %d, global 3shot acc: [head: %.3f, middle: %.3f, tail: %.3f] \n'%(rnd, global_3shot_acc["head"], global_3shot_acc["middle"], global_3shot_acc["tail"]))
-            wene.weno_estimation(g_classifier.state_dict())
+        g_classifier.load_state_dict(copy.deepcopy(linear_w_avg_1))
+        g_classifier_sgb.load_state_dict(copy.deepcopy(linear_w_avg_2))
+            
+        if save_pkl == True:
+            output_g_backbone_path = "./output/gba_integrate_spar_fixed/g_backbone/"
+            output_g_classifier1_path = "./output/gba_integrate_spar_fixed/g_classifier1/"
+            output_g_classifier2_path = "./output/gba_integrate_spar_fixed/g_classifier2/"
+
+            # 创建文件夹（如果不存在）
+            os.makedirs(output_g_backbone_path, exist_ok=True)
+            os.makedirs(output_g_classifier1_path, exist_ok=True)
+            os.makedirs(output_g_classifier2_path, exist_ok=True)
+            
+             # 保存模型
+            torch.save(g_backbone, os.path.join(output_g_backbone_path, f"g_backbone_{rnd}.pth"))
+            torch.save(g_classifier, os.path.join(output_g_classifier1_path, f"g_classifier1_{rnd}.pth"))
+            torch.save(g_classifier_sgb, os.path.join(output_g_classifier2_path, f"g_classifier2_{rnd}.pth"))
+        
+        acc_s2, global_3shot_acc = globaltest_GBA_Layer(backbone = copy.deepcopy(g_backbone).to(args.device), classifier = copy.deepcopy(ClassifierAdded(g_classifier, g_classifier_sgb)).to(args.device), test_dataset = dataset_test, args = args, dataset_class = datasetObj)
+
+       
+
+        
+        # torch.save(g_backbone, "./output/gba_integrate/g_backbone/" + "g_backbone_" + str(rnd) + ".pth")
+        # torch.save(g_classifier, "./output/gba_integrate/g_classifier1/" + "g_classifier1_" + str(rnd) + ".pth")
+        # torch.save(g_classifier_sgb, "./output/gba_integrate/g_classifier2/" + "g_classifier2_" + str(rnd) + ".pth")
+        print('round %d, global test acc  %.3f \n'%(rnd, acc_s2))
+        print('round %d, global 3shot acc: [head: %.3f, middle: %.3f, tail: %.3f] \n'%(rnd, global_3shot_acc["head"], global_3shot_acc["middle"], global_3shot_acc["tail"]))
+            # wene.weno_estimation(g_classifier.state_dict())
         g_linears = [copy.deepcopy(g_classifier) for i in range(args.num_users)]
+        g_linears_sgb = [copy.deepcopy(g_classifier_sgb) for i in range(args.num_users)]
         # f_acc.write('round %d, local average test acc  %.4f \n'%(rnd, avg_local_acc))
         # f_acc.write('round %d, local macro average F1 score  %.4f \n'%(rnd, avg_f1_macro))
         # f_acc.write('round %d, local weighted average F1 score  %.4f \n'%(rnd, avg_f1_weighted))
