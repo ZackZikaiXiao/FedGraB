@@ -122,11 +122,11 @@ if __name__ == '__main__':
     # netglob.load_state_dict(torch.load("/home/zikaixiao/zikai/aaFL/flpid_cifar100_baseline/output/model_parameter_fednova_lr0.005306.pkl"))
     # netglob.load_state_dict(torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/model_parameter_normal_207.pkl"))
     # netglob = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/if100/netglob_499.pth", map_location='cpu')
-    # netglob = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/if10/netglob_120.pth")
-
-    # acc_s2, global_3shot_acc = globaltest(copy.deepcopy(netglob).to(args.device), dataset_test, args, dataset_class = datasetObj)
-    # print('round %d, global test acc  %.3f \n'%(-1, acc_s2))
-    # print('round %d, global 3shot acc: [head: %.3f, middle: %.3f, tail: %.3f] \n'%(-1, global_3shot_acc["head"], global_3shot_acc["middle"], global_3shot_acc["tail"]))
+    netglob = torch.load("/home/zikaixiao/zikai/aaFL/fl_gba_cifar100/output/if100/netglob_499.pth")
+    
+    acc_s2, global_3shot_acc = globaltest(copy.deepcopy(netglob).to(args.device), dataset_test, args, dataset_class = datasetObj)
+    print('round %d, global test acc  %.3f \n'%(-1, acc_s2))
+    print('round %d, global 3shot acc: [head: %.3f, middle: %.3f, tail: %.3f] \n'%(-1, global_3shot_acc["head"], global_3shot_acc["middle"], global_3shot_acc["tail"]))
 
     # copy weights
     w_glob = netglob.state_dict()  # return a dictionary containing a whole state of the module
@@ -148,7 +148,9 @@ if __name__ == '__main__':
     # 更新3shot类别，进行pid mask
     # weno_obj.visualization(rnd)
     for idx in range(args.num_users):
-        pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 2)], middle_class=[i for i in range(2, 30)], tail_class=[i for i in range(30, 100)])
+        # pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 1)], middle_class=[i for i in range(1, 2)], tail_class=[i for i in range(2, 100)])
+        pid_losses[idx].get_3shotclass([], [], tail_class=[i for i in range(0, 100)])
+
         # 注意下面两个的顺序，类激活将没有mask的class初始化为关闭，根据label打开
         pid_losses[idx].apply_3shot_mask()  # 应用3shot mask
         pid_losses[idx].apply_class_activation()    #应用类激活

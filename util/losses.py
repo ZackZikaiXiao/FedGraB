@@ -77,7 +77,7 @@ class PIDLOSS(nn.Module):
         self.class_weight = class_weight
         self.num_classes = num_classes
         self.group = True
-        self.hook = Hook()  # 用来改梯度的
+        # self.hook = Hook()  # 用来改梯度的
         self.controllers = [PID() for _ in range(self.num_classes)]  # 一个类别一个控制器
         self.pidmask = pidmask
         self.class_activation = class_activation
@@ -179,7 +179,7 @@ class PIDLOSS(nn.Module):
         cls_loss = torch.sum(cls_loss) / self.n_i
         hook_handle = cls_score.register_hook(self.hook_func_tensor_bak)
         # self.collect_grad(cls_score.detach(), self.target.detach(), self.weight.detach())
-        # self.print_for_debug()
+        self.print_for_debug()
         # hook_handle.remove()
         return self.loss_weight * cls_loss
 
@@ -301,7 +301,7 @@ class PIDLOSS(nn.Module):
         # # 收集梯度: collect_grad可用，这里不再使用
         target_temp = self.target.detach()
         grad_temp = grad.detach()
-        grad_temp = torch.abs(grad_temp)
+        # grad_temp = torch.abs(grad_temp)
 
         # 更新accu grad
         # grad_temp *= self.weight
@@ -434,9 +434,9 @@ class PIDLOSS(nn.Module):
         return pos_w, neg_w
 
     def print_for_debug(self):
-        # print("pos", self.pos_grad)
-        # print("neg", self.neg_grad)
-        # print("ratio", self.pos_neg)
+        print("pos", self.pos_grad)
+        print("neg", self.neg_grad)
+        print("ratio", self.pos_neg)
         print("diff", self.pn_diff)
         # print("pos_w", self.pos_w)
         # print("neg_w", self.neg_w)
@@ -476,39 +476,39 @@ class PIDLOSS(nn.Module):
         return (data - mu) / sigma
 
 
-class Hook():
-    def __init__(self):
-        self.m_count = 0    # for debug
-        # hook函数中临时变量的保存
-        self.input_grad_list = []
-        self.output_grad_list = []
-        self.gradient = None
-        self.gradient_list = []
+# class Hook():
+#     def __init__(self):
+#         self.m_count = 0    # for debug
+#         # hook函数中临时变量的保存
+#         self.input_grad_list = []
+#         self.output_grad_list = []
+#         self.gradient = None
+#         self.gradient_list = []
 
-    def has_gradient(self):
-        return self.gradient != None
+#     def has_gradient(self):
+#         return self.gradient != None
 
-    def get_gradient(self):
-        return self.gradient
+#     def get_gradient(self):
+#         return self.gradient
 
-    def hook_func_tensor(self, grad):
-        grad = copy.deepcopy(grad)
-        self.gradient = grad.cpu().numpy().tolist()  # [200, 10] -> [10, 200]
-        # print(type(self.gradient))
-        # print("tensor hook", self.m_count)
-        # print(grad)
-        # print(grad.shape)
-        self.m_count += 1
+#     def hook_func_tensor(self, grad):
+#         grad = copy.deepcopy(grad)
+#         self.gradient = grad.cpu().numpy().tolist()  # [200, 10] -> [10, 200]
+#         # print(type(self.gradient))
+#         # print("tensor hook", self.m_count)
+#         # print(grad)
+#         # print(grad.shape)
+#         self.m_count += 1
 
-    def hook_func_model(self, module, grad_input, grad_output):
-        pass
-        # print("model hook", )
-        # print(module)
-        # print('grad_input', grad_input)
-        # print('grad_output', grad_output)
+#     def hook_func_model(self, module, grad_input, grad_output):
+#         pass
+#         # print("model hook", )
+#         # print(module)
+#         # print('grad_input', grad_input)
+#         # print('grad_output', grad_output)
 
-    def hook_func_operator(self, module, grad_input, grad_output):
-        pass
+#     def hook_func_operator(self, module, grad_input, grad_output):
+#         pass
 
 
 class PID():
@@ -518,9 +518,13 @@ class PID():
         # self.Ki = 0.01
         # self.Kd = 0.1
 
-        self.Kp = 10
-        self.Ki = 0.01 # 0.01
-        self.Kd = 0.1
+        self.Kp = 0
+        self.Ki = 0 # 0.01
+        self.Kd = 0
+
+        # self.Kp = 10
+        # self.Ki = 0.01 # 0.01
+        # self.Kd = 0.1
 
         self.max_out = 100  # PID最大输出
         self.max_iout = 100  # PID最大积分输出
