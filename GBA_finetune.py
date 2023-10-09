@@ -142,18 +142,17 @@ if __name__ == '__main__':
     # client_distribution = datasetObj.training_set_distribution
     for idx in range(args.num_users):
         # three_shot_dict, _ = shot_split(client_distribution[idx], threshold_3shot=[75, 95])
-        # 听说用全局的分布来pid特别牛逼？
         pid_losses[idx].get_3shotclass(head_class=[], middle_class=[], tail_class=[])   # 最开始不mask
 
     # 更新3shot类别，进行pid mask
     # weno_obj.visualization(rnd)
     for idx in range(args.num_users):
         # pid_losses[idx].get_3shotclass(head_class=[i for i in range(0, 1)], middle_class=[i for i in range(1, 2)], tail_class=[i for i in range(2, 100)])
-        pid_losses[idx].get_3shotclass([], [], tail_class=[i for i in range(0, 100)])
+        pid_losses[idx].get_3shotclass(head_class=[0, 5], middle_class=[5,10], tail_class=[i for i in range(10, 99)])
 
         # 注意下面两个的顺序，类激活将没有mask的class初始化为关闭，根据label打开
         pid_losses[idx].apply_3shot_mask()  # 应用3shot mask
-        pid_losses[idx].apply_class_activation()    #应用类激活
+        # pid_losses[idx].apply_class_activation()    #应用类激活
     # torch.save(w_glob, "./output/w_glob_" + str(rnd) + ".pkl")
     # add fl training
     for rnd in range(args.rounds):

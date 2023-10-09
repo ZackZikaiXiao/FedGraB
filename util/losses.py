@@ -106,8 +106,9 @@ class PIDLOSS(nn.Module):
         self.test_with_obj = test_with_obj
 
         def _func(x):
-            return (10 / 9) / ((1 / 9) + torch.exp(-0.05 * x))
+            return (10 / 9) / ((1 / 9) + torch.exp(-0.01 * x))
         self.map_func = partial(_func)
+        self.interation = 0
 
     def clear(self):
         self.pos_grad = self.pos_grad - self.pos_grad
@@ -138,50 +139,40 @@ class PIDLOSS(nn.Module):
         # PID 
         # weight是啥啊:每个bce有一个loss，一共有[20, 10]个loss
         self.pos_w, self.neg_w = self.get_weight(self.target)
+        
+        monitor = True
+        monitor = False
+        if monitor:
+            print("pos", self.pos_grad)
+            print("neg", self.neg_grad)
+            # print("ratio", self.pos_neg)
+            print("diff", self.pn_diff)
+            print(self.pos_w, self.neg_w)
+
         self.weight = self.pos_w * self.target + self.neg_w * (1 - self.target)
 
-        # class activation，
-        if self.class_activation:       # 开启了类激活
-            if self.class_acti_mask == None:    # 初始化
-                self.class_acti_mask = cls_score.new_ones(self.n_i, self.n_c)
-                for i in range(self.n_c):       # 没有mask的class，设置为0 
-                    if "head" not in self.pidmask and i in self.head_class:    
-                        self.class_acti_mask[torch.arange(self.n_i), i] = 0
-                    if "middle" not in self.pidmask and i in self.middle_class:
-                        self.class_acti_mask[torch.arange(self.n_i), i] = 0
-                    if "tail" not in self.pidmask and i in self.tail_class: 
-                        self.class_acti_mask[torch.arange(self.n_i), i] = 0
-            else:       # 每次看samples时
-                for i in range(label.shape[0]):       
-                    one_class = label[i]
-                    if "head" not in self.pidmask and one_class in self.head_class:    
-                        # print("重要信息：有了类别 ->  ", str(one_class))
-                        self.class_acti_mask[torch.arange(self.n_i), one_class] = 1
-                        self.controllers[one_class].open()
-                    if "middle" not in self.pidmask and one_class in self.middle_class:
-                        self.class_acti_mask[torch.arange(self.n_i), one_class] = 1
-                        self.controllers[one_class].open()
-                        # print("重要信息：有了类别 ->  ", str(one_class))
-                    if "tail" not in self.pidmask and one_class in self.tail_class: 
-                        self.class_acti_mask[torch.arange(self.n_i), one_class] = 1
-                        self.controllers[one_class].open()
-                        # print("重要信息：有了类别 ->  ", str(one_class))
-            self.weight *= self.class_acti_mask[0:self.n_i, :]
-        # 只管tail类别
-        # classmask = cls_score.new_zeros(self.n_i, self.n_c)
-        # classmask[torch.arange(self.n_i), 6:] = 1   # 就[6-10]是1
-        # self.weight *= classmask
-        # self.weight[torch.arange(self.n_i), :6] = 1
 
         cls_loss = F.binary_cross_entropy_with_logits(
             cls_score, self.target, reduction='none')
         # cls_loss = torch.sum(cls_loss * self.weight) / self.n_i
         cls_loss = torch.sum(cls_loss) / self.n_i
-        hook_handle = cls_score.register_hook(self.hook_func_tensor_bak)
+        hook_handle = cls_score.register_hook(self.hook_func_tensor)
         # self.collect_grad(cls_score.detach(), self.target.detach(), self.weight.detach())
-        self.print_for_debug()
+        # self.print_for_debug()
         # hook_handle.remove()
+
+        self.interation += 1
+        if self.interation % 50 == 0:
+            self.interation = 0
+            for i in range(10, len(self.controllers)):
+                self.controllers[i].reset()
+                self.controllers[i].open()
+            for i in range(10, len(self.controllers)):
+                self.pos_grad[i] = 0
+                self.neg_grad[i] = 0
+
         return self.loss_weight * cls_loss
+
 
     def hook_func_tensor(self, grad):
         # 更改梯度
@@ -202,8 +193,8 @@ class PIDLOSS(nn.Module):
         # dist = self.dist.reshape((1,self.dist.shape[0]))
         # dist_prob = scaler.fit_transform(dist)
         # print("dist_prob", dist_prob)
-        global_mode = False
-        if global_mode == True:
+        global_mode = True
+        if global_mode:
             # 生成概率分布
             tail_length = len(self.tail_class)
             img_max = 1
@@ -258,39 +249,12 @@ class PIDLOSS(nn.Module):
         self.neg_grad += neg_grad
         self.pos_neg = self.pos_grad / (self.neg_grad + 1e-20)
         # self.pn_diff = torch.abs(self.pos_grad - self.neg_grad)
-        self.pn_diff = self.pos_grad - self.neg_grad
-
-        # print(self.pn_diff)
-        # print("/n /n /n ")
-        # for sample_id in range(batch_size):     # 对于每个样本
-        #     for classifier_id in range(class_nums):  # 对于每个分类器
-        #         if classifier_id == self.gt_classes[sample_id]: # 正样本
-        #             grad[sample_id][classifier_id] *= self.pos_w[classifier_id]               # 加权
-        #         else:
-        #             grad[sample_id][classifier_id] *= self.neg_w[classifier_id]               # 加权
-        # # print("真实的值:")
-        # print(grad)
-        # grad = self.grad
-
-        # 调pid参数用的
-        # global glo_itr
-        # global writer
-        # glo_itr += 1
-        # # print(glo_itr)
-        # for i in range(10):
-        #     writer.add_scalar("diff " + str(i),
-        #                       self.pn_diff[i], global_step=glo_itr)
-    
+        self.pn_diff = 50 * self.pos_grad - 0.5 * self.neg_grad
 
     def hook_func_tensor_bak(self, grad):
-        # 更改梯度
-        a = 1
-        # print("weight", self.weight.shape)
-        # print("grad", grad.shape)
 
         batchsize = grad.shape[0]
         classes_num = grad.shape[1]
-        # ran_mask = self.weight.new_ones(batchsize, classes_num)
 
 
         grad *= self.weight
@@ -301,14 +265,9 @@ class PIDLOSS(nn.Module):
         # # 收集梯度: collect_grad可用，这里不再使用
         target_temp = self.target.detach()
         grad_temp = grad.detach()
-        # grad_temp = torch.abs(grad_temp)
+        grad_temp = torch.abs(grad_temp)
 
-        # 更新accu grad
-        # grad_temp *= self.weight
-        # print("target", target_temp)
-        # print("grad", grad_temp)
-
-
+        # print(grad_temp)
         pos_grad = torch.sum(grad_temp * target_temp, dim=0)
         neg_grad = torch.sum(grad_temp * (1 - target_temp), dim=0)
 
@@ -317,28 +276,9 @@ class PIDLOSS(nn.Module):
         self.neg_grad += neg_grad
         self.pos_neg = self.pos_grad / (self.neg_grad + 1e-20)
         # self.pn_diff = torch.abs(self.pos_grad - self.neg_grad)
-        self.pn_diff = self.pos_grad - self.neg_grad
+        self.pn_diff = 50 * self.pos_grad - 0.5 * self.neg_grad
 
-        # print(self.pn_diff)
-        # print("/n /n /n ")
-        # for sample_id in range(batch_size):     # 对于每个样本
-        #     for classifier_id in range(class_nums):  # 对于每个分类器
-        #         if classifier_id == self.gt_classes[sample_id]: # 正样本
-        #             grad[sample_id][classifier_id] *= self.pos_w[classifier_id]               # 加权
-        #         else:
-        #             grad[sample_id][classifier_id] *= self.neg_w[classifier_id]               # 加权
-        # # print("真实的值:")
-        # print(grad)
-        # grad = self.grad
 
-        # 调pid参数用的
-        # global glo_itr
-        # global writer
-        # glo_itr += 1
-        # # print(glo_itr)
-        # for i in range(10):
-        #     writer.add_scalar("diff " + str(i),
-        #                       self.pn_diff[i], global_step=glo_itr)
 
     def set_mask(self, pidmask):
         self.pidmask = pidmask
@@ -419,12 +359,12 @@ class PIDLOSS(nn.Module):
                 pos_w[i] = self.map_func(pid_out)   # 让pos多点
                 
                 neg_w[i] = self.map_func(-pid_out)  # 让neg少点
-                neg_w[i] = self.map_func(torch.zeros_like(pid_out, dtype=pid_out.dtype))   # 不调neg
+                # neg_w[i] = self.map_func(torch.zeros_like(pid_out, dtype=pid_out.dtype))   # 不调neg
             else:                           # pos太多
                 pos_w[i] = self.map_func(pid_out)  # 让pos少点
                 
                 neg_w[i] = self.map_func(-pid_out)   # 让neg多点
-                neg_w[i] = self.map_func(torch.zeros_like(pid_out, dtype=pid_out.dtype))   # 不调neg
+                # neg_w[i] = self.map_func(torch.zeros_like(pid_out, dtype=pid_out.dtype))   # 不调neg
 
         debug = 12
         # neg_w = self.map_func(self.pos_neg)
@@ -518,7 +458,7 @@ class PID():
         # self.Ki = 0.01
         # self.Kd = 0.1
 
-        self.Kp = 0
+        self.Kp = 10
         self.Ki = 0 # 0.01
         self.Kd = 0
 

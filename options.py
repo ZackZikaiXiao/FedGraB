@@ -8,7 +8,7 @@ def args_parser():
     # federated arguments
     parser.add_argument('--iteration1', type=int, default=5, help="enumerate iteration in preprocessing stage")
     parser.add_argument('--rounds', type=int, default=500, help="rounds of training in fine_tuning stage")
-    parser.add_argument('--local_ep', type=int, default=500000, help="number of local epochs in preprocessing stage")    # 5
+    parser.add_argument('--local_ep', type=int, default=1, help="number of local epochs in preprocessing stage")    # 5
     parser.add_argument('--frac', type=float, default=0.2, help="fration of selected clients in preprocessing stage")
 
     parser.add_argument('--num_users', type=int, default=20, help="number of uses: K")      # 40   

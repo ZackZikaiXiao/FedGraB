@@ -208,23 +208,24 @@ class LocalUpdate(object):
 
 
     def update_weights_GBA_Finetune(self, net, seed, epoch, pidloss, mu=1, lr=None):
-        # 冻结一部分层
-        count = 0
-        for p in net.parameters():
-            if count >= 105:        # 105; 108, 现在不frozen，所以改成0了
-                break
-            p.requires_grad = False
-            count += 1
+        # Freeze all parameters
+        for param in net.parameters():
+            param.requires_grad = True
 
-        filter(lambda p: p.requires_grad, net.parameters())
+        # Unfreeze the classifier (net.linear)
+        for param in net.linear.parameters():
+            param.requires_grad = True
+
+        # Filter parameters that require gradients
+        trainable_params = filter(lambda p: p.requires_grad, net.parameters())
+
         net.train()
+
         # train and update
         if lr is None:
-            optimizer = torch.optim.SGD(
-                filter(lambda p: p.requires_grad, net.parameters()), lr=self.args.lr, momentum=self.args.momentum)
+            optimizer = torch.optim.SGD(trainable_params, lr=self.args.lr, momentum=self.args.momentum)
         else:
-            optimizer = torch.optim.SGD(
-                filter(lambda p: p.requires_grad, net.parameters()), lr=lr, momentum=self.args.momentum)
+            optimizer = torch.optim.SGD(trainable_params, lr=lr, momentum=self.args.momentum)
 
         epoch_loss = []
         for iter in range(epoch):
