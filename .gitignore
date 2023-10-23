@@ -1,0 +1,9 @@
+# 忽略所有 .log 文件
+*.log
+
+# 忽略 node_modules 目录
+cifar_lt/
+__pycache__/
+readme_ready.md
+# 忽略名为 temp 的文件
+temp
