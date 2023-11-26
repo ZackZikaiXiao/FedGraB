@@ -27,7 +27,7 @@ python fed_grab.py --dataset cifar10 --iid --IF 0.01 --local_bs 5 --rounds 500 -
 + To train on CIFAR-10 with non-IID data partition with imbalanced factor 100 , alpha=1 over 40 clients:
 
 ```
-python fed_grab.py --dataset cifar10 -alpha_dirichlet 1 --IF 0.01 --local_bs 5 --rounds 500 --num_users 40 --beta 0 --dataset cifar10  --model resnet18 --gpu 0
+python fed_grab.py --dataset cifar10 --alpha_dirichlet 1 --IF 0.01 --local_bs 5 --rounds 500 --num_users 40 --beta 0 --dataset cifar10  --model resnet18 --gpu 0
 ```
  
 
