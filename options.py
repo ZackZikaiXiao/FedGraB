@@ -14,6 +14,7 @@ def args_parser():
     parser.add_argument('--model', type=str, default='resnet18', help="model name") 
     parser.add_argument('--dataset', type=str, default='cifar10', help="name of dataset") 
     parser.add_argument('--iid', action='store_true', help="i.i.d. or non-i.i.d.")
+    parser.add_argument('--non_iid_prob_class', type=float, default=1, help="non iid sampling prob for class")
     parser.add_argument('--alpha_dirichlet', type=float, default=0.5)  
     parser.add_argument('--num_classes', type=int, default=10, help="number of classes")
     parser.add_argument('--seed', type=int, default=1, help="random seed, default: 1")
